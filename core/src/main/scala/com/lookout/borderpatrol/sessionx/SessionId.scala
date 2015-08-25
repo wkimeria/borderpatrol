@@ -5,8 +5,10 @@ import java.util.concurrent.TimeUnit
 import com.lookout.borderpatrol.sessionx.crypto.Generator
 import com.twitter.bijection.Injection
 import com.twitter.finagle.httpx.Cookie
+import com.twitter.finagle.netty3.ChannelBufferBuf
 import com.twitter.io.Buf
 import com.twitter.util._
+import org.jboss.netty.buffer.ChannelBuffer
 
 import scala.util.{Success, Failure, Try}
 
@@ -36,6 +38,9 @@ object SessionId {
 
   private[this] def currentExpiry: Time =
     Time.now + lifetime
+
+  private[sessionx] def expiresIn(expires: Time): Duration =
+    expires - Time.now
 
   private[sessionx] def expired(t: Time): Boolean =
     t < Time.now || t > currentExpiry
@@ -79,7 +84,7 @@ object SessionId {
   def apply(expires: Time, entropy: Entropy, secret: Secret): SessionId =
     new SessionId(expires, entropy, secret, secret.sign(payload(expires, entropy, secret.id)))
 
-  import SessionIdEncoder.{encodeCookie, encodeString}
+  import SessionIdEncoder.{encodeCookie, encodeString, encodeChannelBuf}
 
   def as[A](id: SessionId)(implicit ev: SessionIdEncoder[A]): A =
     ev.encode(id)
@@ -92,6 +97,9 @@ object SessionId {
 
   def toCookie(id: SessionId): Cookie =
     new Cookie("border_session", toBase64(id))
+
+  def toChannelBuf(id: SessionId): ChannelBuffer =
+    ChannelBufferBuf.Owned.extract(Buf.Utf8(toBase64(id)))
 
   object SessionIdInjections {
 

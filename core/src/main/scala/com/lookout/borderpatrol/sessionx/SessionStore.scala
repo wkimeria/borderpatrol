@@ -1,9 +1,13 @@
 package com.lookout.borderpatrol.sessionx
 
-import com.twitter.io.Buf
-import com.twitter.util.Future
-import com.twitter.finagle.memcachedx
+import java.nio.charset.Charset
 
+import com.twitter.bijection.twitter_util.UtilBijections
+import com.twitter.io.Buf
+import com.twitter.util.{Bijection, Future}
+import com.twitter.finagle.memcachedx
+import com.twitter.finagle.redis
+import org.jboss.netty.buffer.{ChannelBuffer, ChannelBuffers}
 import scala.collection.mutable
 import scala.util.{Success, Failure}
 
@@ -67,6 +71,64 @@ object SessionStore {
      */
     def update[A](session: Session[A])(implicit ev: SessionDataEncoder[A]): Future[Unit] =
       store.set(session.id.asBase64, flag, session.id.expires, ev.encode(session.data))
+  }
+
+  /**
+   * Redis backend to [[com.lookout.borderpatrol.sessionx.SessionStore SessionStore]]
+   *
+   * {{{
+   *   //TODO: Fix this description
+   *   val store = MemcachedStore(Memcachedx.newKetamaClient("localhost:11211"))
+   *   val requestSession = store.get[httpx.Request](id) // default views from `Buf` %> `Request` are included
+   *   requestSession.onSuccess(s => log(s"Success! you were going to ${s.data.uri}"))
+   *                 .onFailure(log)
+   * }}}
+   * @param store finagle [[com.twitter.finagle.memcachedx.BaseClient memcachedx.BaseClient]] memcached backend
+   */
+  case class RedisStore(store: redis.Client)
+    extends SessionStore {
+
+    import com.twitter.finagle.netty3.{ChannelBufferBuf => ChannelBuf}
+
+    def buf2ChannelBuffer(buf: Buf): ChannelBuffer =
+      ChannelBuf.Owned.extract(buf)
+
+    def channelBuffer2Buf(cb: ChannelBuffer): Buf =
+      ChannelBuf.Owned(cb)
+
+
+    /**
+     * Fetches a [[com.lookout.borderpatrol.sessionx.Session Session]] if one exists otherwise `None`. On failure
+     * will make a [[com.twitter.util.Future.exception Future.exception]].
+     *
+     * @param key lookup key
+     * @param ev evidence for converting the Buf to the type of A
+     * @tparam A [[Session.data]] type that must have a view from `Buf %> Option[A]`
+     *
+     * @return
+     */
+
+    def get[A](key: SessionId)(implicit ev: SessionDataEncoder[A]): Future[Option[Session[A]]] =
+      store.get(key.asChannelBuf).flatMap(_ match {
+        case None => Future.value(None)
+        case Some(cb) => ev.decode(channelBuffer2Buf(cb)) match {
+          case Failure(e) => e.toFutureException[Option[Session[A]]]
+          case Success(data) => Some(Session(key, data)).toFuture
+        }}
+      )
+
+    /**
+     * Stores a [[com.lookout.borderpatrol.sessionx.Session Session]]. On failure returns a
+     * [[com.twitter.util.Future.exception Future.exception]]
+     *
+     * @param session
+     * @param ev evidence for the conversion to `Buf`
+     * @tparam A [[Session.data]] type that must have a view from `A %> Buf`
+     *
+     * @return a [[com.twitter.util.Future Future]]
+     */
+    def update[A](session: Session[A])(implicit ev: SessionDataEncoder[A]): Future[Unit] =
+      store.setEx(session.id.asChannelBuf, SessionId.expiresIn(session.id.expires).inSeconds, buf2ChannelBuffer(ev.encode(session.data)))
   }
 
   /**

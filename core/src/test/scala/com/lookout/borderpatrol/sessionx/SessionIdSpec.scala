@@ -1,6 +1,7 @@
 package com.lookout.borderpatrol.sessionx
 
 import com.twitter.finagle.httpx.Cookie
+import org.jboss.netty.buffer.ChannelBuffer
 
 class SessionIdSpec extends BorderPatrolSuite {
   import helpers._
@@ -20,6 +21,8 @@ class SessionIdSpec extends BorderPatrolSuite {
 
     SessionId.from[String](SessionId.as[String](id)).success.value should be(id)
     SessionId.from[Cookie](SessionId.as[Cookie](id)).success.value should be(id)
+    SessionId.from[ChannelBuffer](SessionId.as[ChannelBuffer](id)).success.value should be(id)
+
   }
 
   it should "create the same signature using the same secret" in {

@@ -3,8 +3,10 @@ package com.lookout.borderpatrol.sessionx
 import argonaut.Json
 import com.lookout.borderpatrol.sessionx.SessionId.SessionIdInjections
 import com.twitter.finagle.httpx.Cookie
+import com.twitter.finagle.netty3.ChannelBufferBuf
 import com.twitter.io.Buf
 import com.twitter.finagle.httpx
+import org.jboss.netty.buffer.ChannelBuffer
 import scala.util.{Success, Failure, Try}
 
 /**
@@ -18,10 +20,13 @@ trait SessionDataEncoder[A] extends Encoder[A, Buf]
 trait SessionIdEncoder[A] extends Encoder[SessionId, A]
 trait SecretEncoder[A] extends Encoder[Secret, A]
 
+
+
 /**
  * Instances of SessionDataEncoder for A => [[com.twitter.io.Buf]]
  */
 object SessionDataEncoder {
+
   /**
    * Helper method for creating new [[com.lookout.borderpatrol.sessionx.SessionDataEncoder]] instances
    */
@@ -101,6 +106,17 @@ object SessionIdEncoder {
     cookie => SessionIdInjections.str2SessionId(cookie.value)
   )
 
+  /**
+   * A [[com.lookout.borderpatrol.sessionx.SessionIdEncoder SessionIdEncoder]] instance for
+   * [[org.jboss.netty.buffer.ChannelBuffer ChannelBuffer]]
+   */
+  implicit def encodeChannelBuf(implicit secretStoreApi: SecretStoreApi): SessionIdEncoder[ChannelBuffer] = SessionIdEncoder(
+    id => ChannelBufferBuf.Owned.extract(Buf.Utf8(SessionId.toBase64(id))), // SessionId.as[ChannelBuffer]
+    cb => Buf.Utf8.unapply(ChannelBufferBuf.Owned(cb)) match {
+      case None => Failure(SessionIdError("unable to decode channel buffer"))
+      case Some(s) => SessionIdInjections.str2SessionId(s)
+    }
+  )
 }
 
 /**

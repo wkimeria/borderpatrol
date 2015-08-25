@@ -33,6 +33,7 @@ val baseSettings = Seq(
   libraryDependencies ++= Seq(
     "com.twitter" %% "finagle-httpx" % "6.27.0",
     "com.twitter" %% "finagle-memcachedx" % "6.27.0",
+    "com.twitter" %% "finagle-redis" % "6.27.0",
     "org.scala-lang" % "scala-reflect" % scalaVersion.value,
     "com.twitter" %% "bijection-core" % "0.8.1",
     "com.twitter" %% "bijection-util" % "0.8.1",

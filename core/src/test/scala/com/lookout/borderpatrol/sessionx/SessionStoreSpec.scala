@@ -1,8 +1,9 @@
 package com.lookout.borderpatrol.sessionx
 
+import com.twitter.finagle.Redis
+import com.twitter.finagle.redis
 import com.twitter.util.{Future, Await}
-import com.twitter.finagle.httpx
-import com.twitter.finagle.memcachedx
+import com.twitter.finagle.{httpx, memcachedx}
 
 class SessionStoreSpec extends BorderPatrolSuite {
   import helpers._
@@ -11,11 +12,12 @@ class SessionStoreSpec extends BorderPatrolSuite {
 
   val sessionStore = SessionStore.InMemoryStore
   val memcachedSessionStore = SessionStore.MemcachedStore(new memcachedx.MockClient())
+  val redisSessionStore = SessionStore.RedisStore(Redis.newRichClient("localhost:6379"))
   val intSession = sessions.create(1)
   val strSession = sessions.create("hello")
   val reqSession = sessions.create(httpx.Request("localhost:8080/api/hello"))
 
-  val stores: List[SessionStore] = List(sessionStore, memcachedSessionStore)
+  val stores: List[SessionStore] = List(sessionStore, memcachedSessionStore,  redisSessionStore)
 
   def result[A](f: Future[A]): A =
     Await.result(f)

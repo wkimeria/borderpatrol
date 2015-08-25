@@ -26,7 +26,8 @@ package com.lookout.borderpatrol
 
 import argonaut._, Argonaut._
 import com.twitter.finagle.httpx.Cookie
-import com.twitter.util.{Time, Future}
+import com.twitter.util.{Duration, Time, Future}
+import org.jboss.netty.buffer.ChannelBuffer
 
 /**
  * This introduces types and functions that enable identifying, fetching, and storing web session data. This
@@ -151,6 +152,13 @@ package object sessionx extends SessionTypeClasses {
 
     def asCookie: Cookie =
       SessionId.toCookie(id)
+
+    def asChannelBuf: ChannelBuffer =
+      SessionId.toChannelBuf(id)
+
+    def expiresIn: Duration =
+      SessionId.expiresIn(id.expires)
+
   }
 
   /**
